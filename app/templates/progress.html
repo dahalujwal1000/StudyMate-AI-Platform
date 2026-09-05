@@ -1,0 +1,93 @@
+{% extends "app.html" %}
+{% block title %}Progress{% endblock %}
+{% block page %}
+<h1 class="font-display text-headline-lg">Progress &amp; analytics</h1>
+<p class="text-body-md text-on-surface-variant">Mastery per topic, weak areas and score history.</p>
+
+<!-- Top stats -->
+<section class="mt-space-lg grid gap-space-md sm:grid-cols-2 lg:grid-cols-4">
+  {% set total_attempts = attempts|length %}
+  {% set avg = (attempts|map(attribute='score')|sum * 100 / (attempts|map(attribute='total')|sum)) if attempts and attempts|map(attribute='total')|sum > 0 else 0 %}
+  {% set minutes = attempts|map(attribute='total')|sum * 4 %}
+  {% set tasks_done = tasks|selectattr('status', 'equalto', 'done')|list|length %}
+  {% set stats = [
+    ("description", "Documents", docs|length, "text-primary"),
+    ("history_edu", "Quiz attempts", total_attempts, "text-secondary"),
+    ("verified", "Avg. score", (avg|round(0)) ~ "%", "text-tertiary"),
+    ("schedule", "Tasks done", tasks_done ~ "/" ~ (tasks|length), "text-on-surface")
+  ] %}
+  {% for icon, label, value, color in stats %}
+  <div class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card">
+    <span class="material-symbols-rounded filled {{ color }}">{{ icon }}</span>
+    <p class="mt-1 font-display text-headline-md">{{ value }}</p>
+    <p class="text-label-md text-on-surface-variant">{{ label }}</p>
+  </div>
+  {% endfor %}
+</section>
+
+<div class="mt-space-xl grid gap-space-lg lg:grid-cols-2">
+  <!-- Topic mastery -->
+  <section class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+    <h2 class="font-display text-headline-sm">Topic mastery</h2>
+    {% if topics %}
+    <div class="mt-space-md space-y-space-sm">
+      {% for t in topics %}
+      <div>
+        <div class="flex justify-between text-label-md">
+          <span class="truncate">{{ t.title }}</span>
+          <span class="font-semibold">{{ t.mastery }}%</span>
+        </div>
+        <div class="bar-track mt-1 h-2.5">
+          <div class="bar-fill {{ 'bg-tertiary-container' if t.mastery >= 70 else 'bg-secondary-container' if t.mastery >= 40 else 'bg-error' }}" style="width: {{ t.mastery }}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if topics|length > 1 and topics[0].mastery < 70 %}
+    <p class="mt-space-md rounded-lg bg-error-container/60 px-3 py-2 text-body-sm text-on-error-container">
+      <span class="material-symbols-rounded align-middle text-base">priority_high</span>
+      Focus next on: <strong>{{ topics[0].title }}</strong> — your weakest topic.
+    </p>
+    {% endif %}
+    {% else %}
+    <p class="mt-space-md text-body-sm text-on-surface-variant">Take a quiz to start tracking mastery.</p>
+    {% endif %}
+  </section>
+
+  <!-- Score history -->
+  <section class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+    <h2 class="font-display text-headline-sm">Score history</h2>
+    {% if attempts %}
+    <div class="mt-space-md flex h-40 items-end gap-2">
+      {% for a in attempts[-12:] %}
+      {% set pct = (a.score * 100 / a.total)|round(0) if a.total else 0 %}
+      <div class="group flex min-w-6 flex-1 flex-col items-center gap-1">
+        <span class="text-label-sm font-semibold text-on-surface-variant opacity-0 group-hover:opacity-100">{{ pct }}%</span>
+        <div class="w-full rounded-t-lg bg-primary-container transition-all hover:bg-primary" style="height: {{ [pct, 4]|max }}%"></div>
+        <span class="text-[10px] text-outline">{{ a.created_at.strftime('%m/%d') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="mt-2 text-label-sm text-outline">Hover a bar for exact score. {{ minutes }} min of practice so far.</p>
+    {% else %}
+    <p class="mt-space-md text-body-sm text-on-surface-variant">No attempts yet — your history will appear here.</p>
+    {% endif %}
+  </section>
+</div>
+
+<!-- Study streak / tasks -->
+<section class="mt-space-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+  <div class="flex flex-wrap items-center justify-between gap-space-md">
+    <div>
+      <h2 class="font-display text-headline-sm">Planner contribution</h2>
+      <p class="text-body-sm text-on-surface-variant">{{ tasks_done }} of {{ tasks|length }} tasks completed. Consistency beats cramming!</p>
+    </div>
+    <a href="/planner" class="rounded-lg bg-primary px-space-md py-2 text-label-md font-semibold text-on-primary hover:opacity-90">Open planner</a>
+  </div>
+  {% if tasks %}
+  <div class="bar-track mt-space-md h-3">
+    <div class="bar-fill bg-tertiary-container" style="width: {{ (tasks_done * 100 / tasks|length)|round(0) }}%"></div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

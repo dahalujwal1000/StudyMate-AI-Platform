@@ -1,0 +1,106 @@
+{% extends "app.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page %}
+<div class="flex flex-wrap items-end justify-between gap-space-md">
+  <div>
+    <p class="text-label-md text-outline">Welcome back,</p>
+    <h1 class="font-display text-headline-lg">{{ user.name or 'Student' }} 👋</h1>
+  </div>
+  <a href="/upload" class="flex items-center gap-2 rounded-lg bg-primary px-space-md py-2.5 text-label-md font-semibold text-on-primary shadow-glow-primary hover:opacity-90">
+    <span class="material-symbols-rounded text-lg">upload_file</span> New document
+  </a>
+</div>
+
+<!-- Stat cards -->
+<section class="mt-space-lg grid gap-space-md sm:grid-cols-2 lg:grid-cols-4">
+  {% set stats = [
+    ("description", "Documents ready", doc_count, "bg-primary-fixed text-on-primary-fixed"),
+    ("quiz", "Quizzes created", quizzes|length, "bg-secondary-fixed text-on-secondary-fixed"),
+    ("check_circle", "Open tasks", tasks|length, "bg-surface-container-high text-on-surface"),
+    ("local_fire_department", "Keep going", "🔥", "bg-tertiary-fixed text-on-tertiary-fixed")
+  ] %}
+  {% for icon, label, value, badge in stats %}
+  <div class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card">
+    <span class="grid size-10 place-items-center rounded-lg {{ badge }}"><span class="material-symbols-rounded filled text-lg">{{ icon }}</span></span>
+    <p class="mt-space-sm font-display text-headline-md">{{ value }}</p>
+    <p class="text-label-md text-on-surface-variant">{{ label }}</p>
+  </div>
+  {% endfor %}
+</section>
+
+<div class="mt-space-xl grid gap-space-lg lg:grid-cols-3">
+  <!-- Recent documents -->
+  <section class="lg:col-span-2">
+    <div class="flex items-center justify-between">
+      <h2 class="font-display text-headline-md">Recent documents</h2>
+      <a href="/upload" class="text-label-md font-semibold text-primary hover:underline">Upload more</a>
+    </div>
+    <div class="mt-space-sm space-y-space-sm">
+      {% if docs %}
+        {% for d in docs %}
+        <a href="/documents/{{ d.id }}" class="flex items-center gap-space-md rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card transition-colors hover:bg-surface-container-low">
+          <span class="grid size-11 shrink-0 place-items-center rounded-lg bg-primary-fixed text-on-primary-fixed">
+            <span class="material-symbols-rounded filled text-xl">description</span>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-display text-label-lg font-semibold">{{ d.title }}</p>
+            <p class="text-label-sm text-on-surface-variant">
+              {{ d.filename }} · {{ d.page_count }} sections
+            </p>
+          </div>
+          <span class="rounded-full px-2.5 py-1 text-label-sm font-semibold
+            {% if d.status == 'ready' %}bg-tertiary-fixed text-on-tertiary-fixed
+            {% elif d.status == 'error' %}bg-error-container text-on-error-container
+            {% else %}bg-surface-container-high text-on-surface-variant{% endif %}">
+            {{ d.status }}
+          </span>
+        </a>
+        {% endfor %}
+      {% else %}
+        <div class="rounded-xl border border-dashed border-outline-variant bg-surface-container-low p-space-xl text-center">
+          <span class="material-symbols-rounded mx-auto text-4xl text-outline">note_add</span>
+          <p class="mt-2 font-display text-headline-sm">No documents yet</p>
+          <p class="text-body-sm text-on-surface-variant">Upload a PDF or notes file to unlock summaries, chat and quizzes.</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Sidebar: tasks + quizzes -->
+  <aside class="space-y-space-lg">
+    <section>
+      <h2 class="font-display text-headline-sm">Up next</h2>
+      <div class="mt-space-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card">
+        {% if tasks %}
+          {% for t in tasks %}
+          <div class="flex items-center gap-2 py-1.5 {% if not loop.first %}border-t border-outline-variant{% endif %}">
+            <span class="material-symbols-rounded text-lg text-primary">radio_button_unchecked</span>
+            <div class="min-w-0">
+              <p class="truncate text-body-sm font-medium">{{ t.title }}</p>
+              <p class="text-label-sm text-outline">{{ t.course or 'General' }} · {{ t.due_date or 'no date' }}</p>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="py-2 text-body-sm text-on-surface-variant">Nothing planned — <a href="/planner" class="font-semibold text-primary hover:underline">add a task</a>.</p>
+        {% endif %}
+      </div>
+    </section>
+    <section>
+      <h2 class="font-display text-headline-sm">Latest quizzes</h2>
+      <div class="mt-space-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card">
+        {% if quizzes %}
+          {% for q in quizzes %}
+          <a href="/quiz/{{ q.id }}" class="flex items-center justify-between py-1.5 {% if not loop.first %}border-t border-outline-variant{% endif %} hover:opacity-80">
+            <span class="truncate text-body-sm font-medium">{{ q.title }}</span>
+            <span class="material-symbols-rounded text-lg text-primary">chevron_right</span>
+          </a>
+          {% endfor %}
+        {% else %}
+          <p class="py-2 text-body-sm text-on-surface-variant">Generate your first quiz from any uploaded document.</p>
+        {% endif %}
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

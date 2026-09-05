@@ -1,0 +1,17 @@
+# StudyMate AI — Python 3.13/3.14 compatible
+fastapi>=0.115
+uvicorn[standard]>=0.32
+jinja2>=3.1
+python-multipart>=0.0.12
+sqlalchemy>=2.0
+itsdangerous>=2.2
+httpx>=0.27
+authlib>=1.4
+pydantic>=2.9
+pydantic-settings>=2.6
+# document parsing
+pypdf>=5.0
+python-pptx>=1.0
+python-docx>=1.1
+# LLM (Gemini free tier default; Groq supported via env)
+google-genai>=0.8

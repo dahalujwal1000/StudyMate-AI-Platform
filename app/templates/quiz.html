@@ -1,0 +1,89 @@
+{% extends "app.html" %}
+{% block title %}Quiz{% endblock %}
+{% block page %}
+<div class="flex flex-wrap items-end justify-between gap-space-md">
+  <div>
+    <h1 class="font-display text-headline-lg">Quizzes &amp; flashcards</h1>
+    <p class="text-body-md text-on-surface-variant">Generate practice questions from any processed document.</p>
+  </div>
+</div>
+
+<!-- Generator -->
+<section class="mt-space-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+  <h2 class="font-display text-headline-sm">New generator</h2>
+  <div class="mt-space-sm flex flex-wrap items-end gap-space-md">
+    <div class="min-w-56 flex-1">
+      <label class="text-label-sm font-semibold text-on-surface-variant">Document</label>
+      <select id="gen-doc" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+        {% if docs %}{% for d in docs %}<option value="{{ d.id }}">{{ d.title }}</option>{% endfor %}
+        {% else %}<option value="">— no ready documents —</option>{% endif %}
+      </select>
+    </div>
+    <div>
+      <label class="text-label-sm font-semibold text-on-surface-variant">Type</label>
+      <select id="gen-kind" class="mt-1 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+        <option value="mcq">MCQ quiz</option>
+        <option value="flashcards">Flashcards</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-label-sm font-semibold text-on-surface-variant">Items</label>
+      <input id="gen-count" type="number" min="3" max="12" value="5"
+             class="mt-1 w-24 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+    </div>
+    <button id="gen-btn" onclick="generate()" class="flex items-center gap-2 rounded-lg bg-primary px-space-md py-2.5 text-label-md font-semibold text-on-primary hover:opacity-90">
+      <span class="material-symbols-rounded text-lg">auto_awesome</span> Generate
+    </button>
+  </div>
+  <p id="gen-status" class="mt-2 hidden text-body-sm text-on-surface-variant"></p>
+</section>
+
+<!-- Existing quizzes -->
+<section class="mt-space-xl">
+  <h2 class="font-display text-headline-md">Your quizzes</h2>
+  <div class="mt-space-sm grid gap-space-sm sm:grid-cols-2 lg:grid-cols-3">
+    {% if quizzes %}
+      {% for q in quizzes %}
+      <a href="/quiz/{{ q.id }}" class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card transition-transform hover:-translate-y-0.5">
+        <span class="grid size-10 place-items-center rounded-lg {{ 'bg-primary-fixed text-on-primary-fixed' if q.kind == 'mcq' else 'bg-secondary-fixed text-on-secondary-fixed' }}">
+          <span class="material-symbols-rounded filled text-lg">{{ 'quiz' if q.kind == 'mcq' else 'style' }}</span>
+        </span>
+        <p class="mt-2 truncate font-display text-label-lg font-semibold">{{ q.title }}</p>
+        <p class="text-label-sm text-on-surface-variant">{{ q.questions|length }} items · {{ q.attempts|length }} attempts</p>
+      </a>
+      {% endfor %}
+    {% else %}
+      <p class="text-body-sm text-on-surface-variant">Nothing here yet — generate your first quiz above.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  async function generate() {
+    const btn = document.getElementById('gen-btn');
+    const status = document.getElementById('gen-status');
+    const docId = document.getElementById('gen-doc').value;
+    if (!docId) { status.textContent = 'Upload and process a document first.'; status.classList.remove('hidden'); return; }
+    btn.disabled = true;
+    status.textContent = 'Generating — the AI is reading your material…';
+    status.classList.remove('hidden');
+    try {
+      const res = await fetch('/api/quiz/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document_id: parseInt(docId),
+          kind: document.getElementById('gen-kind').value,
+          count: parseInt(document.getElementById('gen-count').value || '5')
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Generation failed');
+      window.location = '/quiz/' + data.quiz_id;
+    } catch (e) {
+      status.textContent = '⚠ ' + e.message;
+      btn.disabled = false;
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Your AI study copilot{% endblock %}
+{% block content %}
+<div class="relative overflow-hidden">
+  <div class="glow-blob glow-blob--primary -top-24 left-1/4 size-96"></div>
+  <div class="glow-blob glow-blob--secondary -right-24 top-32 size-80"></div>
+  <div class="glow-blob glow-blob--tertiary bottom-0 left-0 size-72 opacity-30"></div>
+
+  <!-- Nav -->
+  <header class="relative z-10 mx-auto flex h-16 max-w-content-max-width items-center justify-between px-gutter">
+    <div class="flex items-center gap-space-xs">
+      <span class="grid size-9 place-items-center rounded-lg bg-primary text-on-primary shadow-glow-primary">
+        <span class="material-symbols-rounded filled text-xl">school</span>
+      </span>
+      <span class="font-display text-headline-sm font-bold">StudyMate<span class="text-primary">AI</span></span>
+    </div>
+    <a href="/auth/login"
+       class="flex items-center gap-2 rounded-lg bg-primary px-space-md py-2.5 text-label-md font-semibold text-on-primary shadow-glow-primary transition-transform hover:scale-[1.03]">
+      <span class="material-symbols-rounded text-lg">login</span> Sign up free
+    </a>
+  </header>
+
+  <!-- Hero -->
+  <section class="relative z-10 mx-auto max-w-3xl px-gutter pb-space-3xl pt-space-3xl text-center">
+    {% set errors = {
+      "denied": "You cancelled the Google sign-in. That's fine — you can use the demo or try again.",
+      "missing_code": "Google didn't return an authorization code. Please try signing in again.",
+      "oauth_failed": "Something went wrong during Google sign-in (state or token mismatch). Please try again.",
+      "no_email": "Your Google account didn't provide an email. Try a different account."
+    } %}
+    {% if error and error in errors %}
+    <div class="mx-auto mb-space-md flex max-w-2xl items-start gap-3 rounded-lg border border-error/30 bg-error-container px-space-md py-3 text-left text-body-sm text-on-error-container">
+      <span class="material-symbols-rounded mt-0.5 text-lg">error</span>
+      <span>{{ errors[error] }}</span>
+    </div>
+    {% endif %}
+    <span class="inline-flex items-center gap-1.5 rounded-full bg-primary-fixed px-3 py-1 text-label-sm font-semibold text-on-primary-fixed">
+      <span class="material-symbols-rounded text-sm filled">auto_awesome</span> RAG-powered · Free tier friendly
+    </span>
+    <h1 class="mt-space-md font-display text-display-lg text-on-surface">
+      Turn your notes into <span class="text-primary">answers</span>, quizzes &amp; a study plan
+    </h1>
+    <p class="mx-auto mt-space-md max-w-2xl text-body-lg text-on-surface-variant">
+      Upload your PDFs, slides and notes. StudyMate summarizes them, answers questions with cited
+      sources, quizzes you, and keeps your progress on track.
+    </p>
+    <div class="mt-space-lg flex flex-wrap items-center justify-center gap-space-sm">
+      <a href="/auth/login"
+         class="flex items-center gap-2 rounded-lg bg-primary px-space-lg py-3 text-label-lg font-semibold text-on-primary shadow-glow-primary transition-transform hover:scale-[1.03]">
+        <span class="material-symbols-rounded text-xl">upload_file</span> Start with a document
+      </a>
+      <a href="/auth/demo"
+         class="rounded-lg border border-outline-variant bg-surface-container-lowest px-space-lg py-3 text-label-lg font-semibold text-on-surface transition-colors hover:bg-surface-container">
+        Try the live demo
+      </a>
+    </div>
+    <p class="mt-space-sm text-label-sm text-outline">No credit card. Works with your free Gemini or Groq API key.</p>
+  </section>
+
+  <!-- Feature cards -->
+  <section class="relative z-10 mx-auto grid max-w-content-max-width gap-space-md px-gutter pb-space-3xl sm:grid-cols-2 lg:grid-cols-3">
+    {% set features = [
+      ("description", "Document intelligence", "Drop in PDFs, slides or notes. StudyMate extracts, chunks and summarizes every page.", "bg-primary-fixed text-on-primary-fixed"),
+      ("forum", "Grounded Q&amp;A chat", "Ask anything about your material. Every answer cites the page or slide it came from.", "bg-secondary-fixed text-on-secondary-fixed"),
+      ("quiz", "Auto quizzes &amp; flashcards", "Generate MCQs and active-recall flashcards from any document, then track your scores.", "bg-surface-container-high text-on-surface"),
+      ("event_note", "Study planner", "Plan readings, deadlines and sessions in one lightweight list.", "bg-surface-container-high text-on-surface"),
+      ("monitoring", "Progress dashboard", "See mastery per topic, weak areas and score history at a glance.", "bg-tertiary-fixed text-on-tertiary-fixed"),
+      ("psychology", "Built for real learning", "Retrieval-augmented answers keep the AI honest — grounded in what you actually uploaded.", "bg-primary-fixed text-on-primary-fixed")
+    ] %}
+    {% for icon, title, text, badge in features %}
+    <article class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card transition-transform hover:-translate-y-1">
+      <span class="grid size-11 place-items-center rounded-lg {{ badge }}">
+        <span class="material-symbols-rounded filled text-xl">{{ icon }}</span>
+      </span>
+      <h3 class="mt-space-md font-display text-headline-sm">{{ title|safe }}</h3>
+      <p class="mt-2 text-body-sm text-on-surface-variant">{{ text|safe }}</p>
+    </article>
+    {% endfor %}
+  </section>
+
+  <!-- How it works -->
+  <section class="relative z-10 mx-auto max-w-content-max-width px-gutter pb-space-3xl">
+    <h2 class="text-center font-display text-headline-lg">Your core loop</h2>
+    <div class="mt-space-lg grid gap-space-md md:grid-cols-4">
+      {% set steps = [
+        ("upload_file","1. Ingest","Upload a PDF, PPTX, DOCX or notes file."),
+        ("manage_search","2. Understand","It's parsed, chunked, indexed and summarized."),
+        ("forum","3. Interact","Chat with citations, take quizzes, flip flashcards."),
+        ("trending_up","4. Improve","Planner + analytics show what to revise next.")
+      ] %}
+      {% for icon, title, text in steps %}
+      <div class="rounded-xl bg-surface-container-low p-space-lg">
+        <span class="material-symbols-rounded filled text-primary text-3xl">{{ icon }}</span>
+        <h3 class="mt-2 font-display text-headline-sm">{{ title }}</h3>
+        <p class="mt-1 text-body-sm text-on-surface-variant">{{ text }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="relative z-10 mx-auto max-w-content-max-width px-gutter pb-space-3xl">
+    <div class="relative overflow-hidden rounded-2xl bg-primary px-space-lg py-space-2xl text-center shadow-glow-primary">
+      <div class="glow-blob glow-blob--secondary -top-16 right-1/4 size-72 opacity-40"></div>
+      <h2 class="font-display text-display-md text-on-primary">Ready to study smarter?</h2>
+      <p class="mx-auto mt-2 max-w-xl text-body-lg text-on-primary-container">Sign in with Google and upload your first document in under a minute.</p>
+      <a href="/auth/login"
+         class="mt-space-lg inline-flex items-center gap-2 rounded-lg bg-surface-container-lowest px-space-lg py-3 text-label-lg font-semibold text-primary transition-transform hover:scale-[1.03]">
+        <span class="material-symbols-rounded text-xl">account_circle</span> Continue with Google
+      </a>
+    </div>
+  </section>
+
+  <footer class="relative z-10 border-t border-outline-variant py-space-md">
+    <p class="text-center text-label-sm text-outline">© 2026 StudyMate AI — Final Year Project</p>
+  </footer>
+</div>
+{% endblock %}

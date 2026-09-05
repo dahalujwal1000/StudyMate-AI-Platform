@@ -1,0 +1,140 @@
+{% extends "app.html" %}
+{% block title %}{{ doc.title }}{% endblock %}
+{% block page %}
+<div class="grid gap-space-lg lg:grid-cols-5">
+  <!-- Document panel -->
+  <section class="lg:col-span-2">
+    <a href="/upload" class="mb-2 inline-flex items-center gap-1 text-label-md font-semibold text-primary hover:underline">
+      <span class="material-symbols-rounded text-base">arrow_back</span> All documents
+    </a>
+    <div class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+      <div class="flex items-start gap-space-md">
+        <span class="grid size-11 place-items-center rounded-lg bg-primary-fixed text-on-primary-fixed">
+          <span class="material-symbols-rounded filled text-xl">description</span>
+        </span>
+        <div class="min-w-0">
+          <h1 class="font-display text-headline-md">{{ doc.title }}</h1>
+          <p class="text-label-sm text-on-surface-variant">{{ doc.filename }} · {{ doc.page_count }} sections</p>
+        </div>
+      </div>
+
+      {% if doc.status == 'processing' %}
+        <div class="mt-space-md rounded-lg bg-surface-container p-space-md text-body-sm text-on-surface-variant">
+          <span class="material-symbols-rounded animate-spin align-middle text-primary">progress_activity</span>
+          Still processing — refresh in a moment.
+        </div>
+      {% elif doc.status == 'error' %}
+        <div class="mt-space-md rounded-lg bg-error-container p-space-md text-body-sm text-on-error-container">
+          Processing failed: {{ doc.error }}
+        </div>
+      {% else %}
+        <h2 class="mt-space-lg font-display text-headline-sm">AI summary</h2>
+        <div class="mt-space-sm rounded-lg bg-surface-container-low p-space-md">
+          <p class="whitespace-pre-line text-body-sm leading-relaxed text-on-surface">{{ doc.summary or 'No summary available.' }}</p>
+        </div>
+        {% if doc.key_topics %}
+        <div class="mt-space-md flex flex-wrap gap-2">
+          {% for t in doc.key_topics %}
+          <span class="rounded-full bg-secondary-fixed px-3 py-1 text-label-sm font-semibold text-on-secondary-fixed">{{ t }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="mt-space-lg flex gap-space-sm">
+          <a href="/quiz" class="flex items-center gap-2 rounded-lg bg-primary px-space-md py-2 text-label-md font-semibold text-on-primary hover:opacity-90">
+            <span class="material-symbols-rounded text-lg">quiz</span> Quiz me
+          </a>
+          <button onclick="askSummary()" class="rounded-lg border border-outline-variant px-space-md py-2 text-label-md font-semibold hover:bg-surface-container">
+            Explain the summary
+          </button>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Chat sidebar -->
+  <section class="lg:col-span-3">
+    <div class="flex h-[70vh] flex-col rounded-xl border border-outline-variant bg-surface-container-lowest shadow-card">
+      <div class="flex items-center gap-2 border-b border-outline-variant px-space-md py-3">
+        <span class="material-symbols-rounded filled text-primary text-xl">forum</span>
+        <h2 class="font-display text-headline-sm">Ask this document</h2>
+        <span class="ml-auto rounded-full bg-tertiary-fixed px-2.5 py-0.5 text-label-sm font-semibold text-on-tertiary-fixed">Grounded · cited</span>
+      </div>
+      <div id="chat-scroll" class="chat-scroll flex-1 space-y-3 overflow-y-auto p-space-md"></div>
+      <form id="chat-form" class="flex gap-2 border-t border-outline-variant p-space-md">
+        <input id="chat-input" type="text" autocomplete="off" placeholder="Ask anything about this document…"
+               class="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-low px-space-md py-2.5 text-body-sm outline-none focus:border-primary">
+        <button class="grid size-10 place-items-center rounded-lg bg-primary text-on-primary hover:opacity-90" aria-label="Send">
+          <span class="material-symbols-rounded text-xl">send</span>
+        </button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const docId = {{ doc.id }};
+  const scroll = document.getElementById('chat-scroll');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+
+  function bubble(role, content, citations) {
+    const wrap = document.createElement('div');
+    const mine = role === 'user';
+    wrap.className = `flex ${mine ? 'justify-end' : 'justify-start'}`;
+    const inner = document.createElement('div');
+    inner.className = mine
+      ? 'max-w-[85%] rounded-xl rounded-br-sm bg-primary px-4 py-2.5 text-body-sm text-on-primary'
+      : 'max-w-[85%] rounded-xl rounded-bl-sm bg-surface-container-low px-4 py-2.5 text-body-sm text-on-surface';
+    inner.innerHTML = content.replace(/\n/g, '<br>').replace(/\[(\d+)\]/g, '<sup class="font-semibold text-primary">[$1]</sup>');
+    if (citations && citations.length) {
+      const cits = document.createElement('div');
+      cits.className = 'mt-2 space-y-1';
+      for (const c of citations) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'block w-full rounded-lg bg-surface-container-high px-2.5 py-1.5 text-left text-label-sm text-on-surface-variant hover:bg-surface-container-highest';
+        el.innerHTML = `<span class="font-semibold text-primary">[${c.n}] ${c.label}</span> — ${c.excerpt}`;
+        el.onclick = () => alert(`Excerpt (${c.label}):\n\n${c.excerpt}…`);
+        cits.appendChild(el);
+      }
+      inner.appendChild(cits);
+    }
+    wrap.appendChild(inner);
+    scroll.appendChild(wrap);
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
+  async function send(msg) {
+    if (!msg.trim()) return;
+    bubble('user', msg);
+    input.value = '';
+    const typing = document.createElement('div');
+    typing.className = 'flex items-center gap-1 px-2';
+    typing.innerHTML = '<span class="typing-dot size-2 rounded-full bg-primary inline-block"></span>'.repeat(3);
+    scroll.appendChild(typing);
+    scroll.scrollTop = scroll.scrollHeight;
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: docId, message: msg })
+      });
+      const data = await res.json();
+      typing.remove();
+      bubble('assistant', data.answer || 'Something went wrong.', data.citations);
+    } catch {
+      typing.remove();
+      bubble('assistant', 'Network error — please try again.');
+    }
+  }
+
+  form.addEventListener('submit', e => { e.preventDefault(); send(input.value); });
+  function askSummary() { send('Explain the summary in simple terms.'); }
+
+  (async () => {
+    const msgs = await (await fetch(`/api/chat/${docId}`)).json();
+    for (const m of msgs) bubble(m.role, m.content, m.citations);
+    if (!msgs.length) bubble('assistant', 'Hi! I read this document for you. Ask a question and I will answer with citations. 📚');
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,47 @@
+/* StudyMate AI — global helpers on top of the Stitch design tokens */
+
+.material-symbols-rounded {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+.material-symbols-rounded.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+/* soft glow blobs behind hero sections (from Stitch landing) */
+.glow-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.glow-blob--primary { background: radial-gradient(circle, #c3c0ff 0%, transparent 70%); }
+.glow-blob--secondary { background: radial-gradient(circle, #d0bcff 0%, transparent 70%); }
+.glow-blob--tertiary { background: radial-gradient(circle, #6ffbbe 0%, transparent 70%); }
+
+/* chat bubbles */
+.chat-scroll { scrollbar-width: thin; scrollbar-color: #c7c4d8 transparent; }
+.chat-scroll::-webkit-scrollbar { width: 6px; }
+.chat-scroll::-webkit-scrollbar-thumb { background: #c7c4d8; border-radius: 9999px; }
+
+/* typing dots */
+.typing-dot { animation: typing 1.2s infinite ease-in-out; }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* progress bars */
+.bar-track { background: #e2e7ff; border-radius: 9999px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 9999px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+/* dropzone hover state */
+.dropzone.dragover { border-color: #3525cd; background: #e2dfff; }
+
+/* flashcard flip */
+.flashcard { perspective: 1200px; }
+.flashcard-inner { transition: transform .5s; transform-style: preserve-3d; }
+.flashcard.flipped .flashcard-inner { transform: rotateY(180deg); }
+.flashcard-face { backface-visibility: hidden; }
+.flashcard-back { transform: rotateY(180deg); }

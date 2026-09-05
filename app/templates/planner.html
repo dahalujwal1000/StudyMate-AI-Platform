@@ -1,0 +1,108 @@
+{% extends "app.html" %}
+{% block title %}Planner{% endblock %}
+{% block page %}
+<div class="flex flex-wrap items-end justify-between gap-space-md">
+  <div>
+    <h1 class="font-display text-headline-lg">Study planner</h1>
+    <p class="text-body-md text-on-surface-variant">Plan readings, deadlines and sessions.</p>
+  </div>
+  <div class="flex gap-space-sm text-label-md">
+    <span class="rounded-full bg-surface-container-high px-3 py-1"><span id="count-todo">0</span> open</span>
+    <span class="rounded-full bg-tertiary-fixed px-3 py-1 text-on-tertiary-fixed"><span id="count-done">0</span> done</span>
+  </div>
+</div>
+
+<!-- Add task -->
+<form id="task-form" class="mt-space-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card">
+  <div class="flex flex-wrap items-end gap-space-md">
+    <div class="min-w-56 flex-1">
+      <label class="text-label-sm font-semibold text-on-surface-variant">What will you study?</label>
+      <input id="task-title" required placeholder="e.g. Revise chapter 4 — neural networks"
+             class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+    </div>
+    <div>
+      <label class="text-label-sm font-semibold text-on-surface-variant">Course</label>
+      <input id="task-course" placeholder="e.g. CS402"
+             class="mt-1 w-32 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+    </div>
+    <div>
+      <label class="text-label-sm font-semibold text-on-surface-variant">Due</label>
+      <input id="task-due" type="date"
+             class="mt-1 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+    </div>
+    <div>
+      <label class="text-label-sm font-semibold text-on-surface-variant">Type</label>
+      <select id="task-type" class="mt-1 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body-sm outline-none focus:border-primary">
+        <option value="reading">📖 Reading</option>
+        <option value="quiz">🧠 Quiz</option>
+        <option value="deadline">📌 Deadline</option>
+        <option value="session">⏱ Session</option>
+      </select>
+    </div>
+    <button class="rounded-lg bg-primary px-space-md py-2.5 text-label-md font-semibold text-on-primary hover:opacity-90">Add task</button>
+  </div>
+</form>
+
+<!-- Task list -->
+<section class="mt-space-xl space-y-2" id="task-list"></section>
+{% endblock %}
+{% block scripts %}
+<script>
+  const list = document.getElementById('task-list');
+  const ICONS = { reading: 'menu_book', quiz: 'quiz', deadline: 'flag', session: 'timer' };
+
+  async function load() {
+    const tasks = await (await fetch('/api/tasks')).json();
+    list.innerHTML = '';
+    let todo = 0, done = 0;
+    for (const t of tasks) {
+      t.status === 'done' ? done++ : todo++;
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-space-md rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card ' + (t.status === 'done' ? 'opacity-60' : '');
+      row.innerHTML = `
+        <button data-toggle="${t.id}" class="grid size-9 shrink-0 place-items-center rounded-full ${t.status === 'done' ? 'bg-tertiary-container text-white' : 'border-2 border-outline-variant hover:border-primary'}">
+          <span class="material-symbols-rounded text-lg">${t.status === 'done' ? 'check' : ''}</span>
+        </button>
+        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-fixed text-on-primary-fixed"><span class="material-symbols-rounded text-lg">${ICONS[t.task_type] || 'menu_book'}</span></span>
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-display text-label-lg font-semibold ${t.status === 'done' ? 'line-through' : ''}">${esc(t.title)}</p>
+          <p class="text-label-sm text-on-surface-variant">${esc(t.course || 'General')} · due ${t.due_date || '—'} · ${t.duration_min} min</p>
+        </div>
+        <button data-del="${t.id}" class="grid size-9 place-items-center rounded-lg text-on-surface-variant hover:bg-error-container hover:text-on-error-container"><span class="material-symbols-rounded text-lg">delete</span></button>`;
+      list.appendChild(row);
+    }
+    document.getElementById('count-todo').textContent = todo;
+    document.getElementById('count-done').textContent = done;
+    list.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => toggle(b.dataset.toggle, tasks.find(t => t.id == b.dataset.toggle).status));
+    list.querySelectorAll('[data-del]').forEach(b => b.onclick = () => del(b.dataset.del));
+  }
+
+  const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function toggle(id, status) {
+    await fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: status === 'done' ? 'todo' : 'done' }) });
+    load();
+  }
+  async function del(id) {
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    load();
+  }
+
+  document.getElementById('task-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: document.getElementById('task-title').value,
+        course: document.getElementById('task-course').value,
+        due_date: document.getElementById('task-due').value,
+        task_type: document.getElementById('task-type').value,
+        duration_min: 30
+      }) });
+    document.getElementById('task-title').value = '';
+    load();
+  });
+
+  load();
+</script>
+{% endblock %}

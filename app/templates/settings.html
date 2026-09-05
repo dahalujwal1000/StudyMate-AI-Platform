@@ -1,0 +1,77 @@
+{% extends "app.html" %}
+{% block title %}Settings{% endblock %}
+{% block page %}
+<div class="mx-auto max-w-2xl">
+  <h1 class="font-display text-headline-lg">Settings</h1>
+  <p class="text-body-md text-on-surface-variant">Profile and integration status.</p>
+
+  <!-- Profile -->
+  <section class="mt-space-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+    <h2 class="font-display text-headline-sm">Profile</h2>
+    <div class="mt-space-md flex items-center gap-space-md">
+      <div class="grid size-14 place-items-center overflow-hidden rounded-full bg-secondary-fixed text-headline-md font-bold text-on-secondary-fixed">
+        {% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="" class="size-full object-cover">{% else %}{{ user.name[:1]|upper }}{% endif %}
+      </div>
+      <div>
+        <p class="font-display text-label-lg font-semibold">{{ user.name }}</p>
+        <p class="text-body-sm text-on-surface-variant">{{ user.email }}</p>
+        {% if user.is_demo %}<span class="mt-1 inline-block rounded-full bg-surface-container-high px-2.5 py-0.5 text-label-sm text-on-surface-variant">Demo account</span>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Integrations -->
+  <section class="mt-space-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+    <h2 class="font-display text-headline-sm">AI provider</h2>
+    <div class="mt-space-md space-y-3">
+      <div class="flex items-center justify-between rounded-lg bg-surface-container-low px-space-md py-3">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-rounded filled text-primary text-xl">auto_awesome</span>
+          <div>
+            <p class="text-body-sm font-semibold">LLM: {{ llm_provider|capitalize }}</p>
+            <p class="text-label-sm text-on-surface-variant">Summaries, chat answers, quiz generation</p>
+          </div>
+        </div>
+        {% if llm_ready %}
+        <span class="rounded-full bg-tertiary-fixed px-3 py-1 text-label-sm font-semibold text-on-tertiary-fixed">Connected</span>
+        {% else %}
+        <span class="rounded-full bg-error-container px-3 py-1 text-label-sm font-semibold text-on-error-container">Offline mode</span>
+        {% endif %}
+      </div>
+      {% if not llm_ready %}
+      <p class="text-body-sm text-on-surface-variant">
+        No API key found. The app still works with extractive (non-AI) summaries and heuristic quizzes.
+        For full AI power, add a free key to your <code class="rounded bg-surface-container px-1.5 py-0.5 text-label-sm">.env</code> file:
+        <a class="font-semibold text-primary hover:underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">GEMINI_API_KEY</a>
+        or <a class="font-semibold text-primary hover:underline" href="https://console.groq.com/keys" target="_blank" rel="noopener">GROQ_API_KEY</a>,
+        then restart the server.
+      </p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="mt-space-lg rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg shadow-card">
+    <h2 class="font-display text-headline-sm">Sign-in</h2>
+    <div class="mt-space-md flex items-center justify-between rounded-lg bg-surface-container-low px-space-md py-3">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-rounded filled text-secondary text-xl">account_circle</span>
+        <div>
+          <p class="text-body-sm font-semibold">Google OAuth</p>
+          <p class="text-label-sm text-on-surface-variant">Set GOOGLE_CLIENT_ID / SECRET in .env</p>
+        </div>
+      </div>
+      {% if oauth_ready %}
+      <span class="rounded-full bg-tertiary-fixed px-3 py-1 text-label-sm font-semibold text-on-tertiary-fixed">Enabled</span>
+      {% else %}
+      <span class="rounded-full bg-surface-container-high px-3 py-1 text-label-sm font-semibold text-on-surface-variant">Demo login</span>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="mt-space-lg mb-space-xl">
+    <a href="/auth/logout" class="flex w-full items-center justify-center gap-2 rounded-lg border border-error px-space-lg py-3 text-label-lg font-semibold text-error transition-colors hover:bg-error-container">
+      <span class="material-symbols-rounded text-xl">logout</span> Sign out
+    </a>
+  </section>
+</div>
+{% endblock %}

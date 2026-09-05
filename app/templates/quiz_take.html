@@ -1,0 +1,122 @@
+{% extends "app.html" %}
+{% block title %}{{ quiz.title }}{% endblock %}
+{% block page %}
+<div class="mx-auto max-w-3xl">
+  <a href="/quiz" class="inline-flex items-center gap-1 text-label-md font-semibold text-primary hover:underline">
+    <span class="material-symbols-rounded text-base">arrow_back</span> All quizzes
+  </a>
+  <h1 class="mt-1 font-display text-headline-lg">{{ quiz.title }}</h1>
+  <p class="text-body-md text-on-surface-variant">{{ quiz.questions|length }} {{ 'questions' if quiz.kind == 'mcq' else 'flashcards' }} from your document.</p>
+
+  {% if quiz.kind == 'mcq' %}
+  <form id="quiz-form" class="mt-space-lg space-y-space-md">
+    {% for q in quiz.questions %}
+    <fieldset class="rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card" data-q="{{ loop.index0 }}">
+      <p class="font-display text-label-lg font-semibold"><span class="text-primary">Q{{ loop.index }}.</span> {{ q.question }}</p>
+      <div class="mt-space-sm grid gap-2">
+        {% for opt in q.options %}
+        <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-outline-variant px-3 py-2.5 text-body-sm transition-colors hover:bg-surface-container-low">
+          <input type="radio" name="q{{ loop.index0 }}" value="{{ loop.index0 }}" class="accent-primary" required>
+          <span>{{ opt }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="mt-2 hidden text-body-sm text-on-surface-variant" data-explanation>💡 {{ q.explanation }}</p>
+    </fieldset>
+    {% endfor %}
+    <button type="submit" class="w-full rounded-lg bg-primary py-3 text-label-lg font-semibold text-on-primary shadow-glow-primary hover:opacity-90">Submit answers</button>
+  </form>
+
+  <div id="result" class="mt-space-lg hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg text-center shadow-card">
+    <p class="text-label-md text-on-surface-variant">Your score</p>
+    <p id="score-line" class="font-display text-display-md text-primary">—</p>
+    <div class="bar-track mx-auto mt-2 h-3 max-w-sm"><div id="score-bar" class="bar-fill bg-tertiary-container" style="width:0%"></div></div>
+    <a href="/quiz" class="mt-space-md inline-block rounded-lg border border-outline-variant px-space-md py-2 text-label-md font-semibold hover:bg-surface-container">Back to quizzes</a>
+  </div>
+
+  {% else %}
+  <!-- Flashcards -->
+  <div id="flash-area" class="mt-space-lg">
+    <div id="flash-card" class="flashcard mx-auto h-72 max-w-lg cursor-pointer">
+      <div class="flashcard-inner relative size-full">
+        <div class="flashcard-face absolute inset-0 grid place-items-center rounded-xl border border-outline-variant bg-surface-container-lowest p-space-lg text-center shadow-card">
+          <div>
+            <p class="text-label-sm font-semibold uppercase tracking-wide text-outline">Question</p>
+            <p id="flash-front" class="mt-2 font-display text-headline-sm"></p>
+          </div>
+        </div>
+        <div class="flashcard-face flashcard-back absolute inset-0 grid place-items-center rounded-xl bg-primary p-space-lg text-center shadow-glow-primary">
+          <div>
+            <p class="text-label-sm font-semibold uppercase tracking-wide text-on-primary-container">Answer</p>
+            <p id="flash-back" class="mt-2 text-body-lg text-on-primary"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-space-md flex items-center justify-center gap-space-md">
+      <button id="flash-prev" class="grid size-11 place-items-center rounded-lg border border-outline-variant hover:bg-surface-container"><span class="material-symbols-rounded">chevron_left</span></button>
+      <button id="flash-flip" class="rounded-lg bg-primary px-space-lg py-2.5 text-label-md font-semibold text-on-primary hover:opacity-90">Flip card</button>
+      <button id="flash-next" class="grid size-11 place-items-center rounded-lg border border-outline-variant hover:bg-surface-container"><span class="material-symbols-rounded">chevron_right</span></button>
+    </div>
+    <p id="flash-count" class="mt-2 text-center text-label-md text-outline"></p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if quiz.kind == 'flashcards' %}
+<script>
+  const cards = [
+    {% for q in quiz.questions %}{ front: {{ q.question|tojson }}, back: {{ q.answer_text|tojson }} }{{ ',' if not loop.last }}{% endfor %}
+  ];
+  let i = 0;
+  const card = document.getElementById('flash-card');
+  function show() {
+    card.classList.remove('flipped');
+    setTimeout(() => {
+      document.getElementById('flash-front').textContent = cards[i].front;
+      document.getElementById('flash-back').textContent = cards[i].back;
+      document.getElementById('flash-count').textContent = `${i + 1} / ${cards.length}`;
+    }, 60);
+  }
+  card.addEventListener('click', () => card.classList.toggle('flipped'));
+  document.getElementById('flash-flip').onclick = () => card.classList.toggle('flipped');
+  document.getElementById('flash-prev').onclick = () => { i = (i - 1 + cards.length) % cards.length; show(); };
+  document.getElementById('flash-next').onclick = () => { i = (i + 1) % cards.length; show(); };
+  show();
+</script>
+{% else %}
+<script>
+  document.getElementById('quiz-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = e.target;
+    const answers = [];
+    const total = {{ quiz.questions|length }};
+    for (let i = 0; i < total; i++) {
+      const sel = form.querySelector(`input[name="q${i}"]:checked`);
+      answers.push(sel ? parseInt(sel.value) : -1);
+    }
+    const res = await fetch('/api/quiz/{{ quiz.id }}/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers })
+    });
+    const data = await res.json();
+    data.review.forEach((r, i) => {
+      const fs = form.querySelector(`fieldset[data-q="${i}"]`);
+      fs.querySelectorAll('label').forEach((lbl, oi) => {
+        if (oi === r.answer_idx) lbl.classList.add('border-tertiary', 'bg-tertiary-fixed/40');
+        else if (oi === r.given) lbl.classList.add('border-error', 'bg-error-container/40');
+      });
+      if (r.explanation) fs.querySelector('[data-explanation]').classList.remove('hidden');
+    });
+    form.querySelector('button[type=submit]').classList.add('hidden');
+    const box = document.getElementById('result');
+    const pct = Math.round(data.score / data.total * 100);
+    document.getElementById('score-line').textContent = `${data.score} / ${data.total} (${pct}%)`;
+    document.getElementById('score-bar').style.width = pct + '%';
+    box.classList.remove('hidden');
+    box.scrollIntoView({ behavior: 'smooth' });
+  });
+</script>
+{% endif %}
+{% endblock %}

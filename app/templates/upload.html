@@ -1,0 +1,117 @@
+{% extends "app.html" %}
+{% block title %}Upload{% endblock %}
+{% block page %}
+<div class="mx-auto max-w-3xl">
+  <h1 class="font-display text-headline-lg">Upload study material</h1>
+  <p class="mt-1 text-body-md text-on-surface-variant">PDF, PPTX, DOCX, TXT or MD — up to 20&nbsp;MB. We extract, chunk and summarize it automatically.</p>
+
+  <!-- Dropzone -->
+  <form id="upload-form" class="mt-space-lg">
+    <label id="dropzone" for="file-input"
+           class="dropzone flex min-h-64 cursor-pointer flex-col items-center justify-center gap-space-sm rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-space-xl text-center transition-colors">
+      <input id="file-input" type="file" class="hidden" accept=".pdf,.pptx,.docx,.txt,.md">
+      <span class="grid size-14 place-items-center rounded-full bg-primary-fixed text-on-primary-fixed">
+        <span class="material-symbols-rounded filled text-3xl">cloud_upload</span>
+      </span>
+      <p class="font-display text-headline-sm">Drag &amp; drop your file here</p>
+      <p class="text-body-sm text-on-surface-variant">or <span class="font-semibold text-primary">browse your files</span></p>
+    </label>
+  </form>
+
+  <!-- Progress card -->
+  <div id="progress-card" class="mt-space-md hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-space-md shadow-card">
+    <div class="flex items-center gap-space-md">
+      <span class="grid size-11 place-items-center rounded-lg bg-primary-fixed text-on-primary-fixed">
+        <span class="material-symbols-rounded filled text-xl">description</span>
+      </span>
+      <div class="min-w-0 flex-1">
+        <p id="progress-filename" class="truncate font-display text-label-lg font-semibold">—</p>
+        <p id="progress-status" class="text-label-sm text-on-surface-variant">Uploading…</p>
+      </div>
+    </div>
+    <div class="bar-track mt-space-sm h-2">
+      <div id="progress-bar" class="bar-fill bg-primary" style="width: 15%"></div>
+    </div>
+  </div>
+
+  <div id="upload-error" class="mt-space-md hidden rounded-lg bg-error-container px-space-md py-3 text-body-sm text-on-error-container"></div>
+
+  <!-- Done doc shortcuts -->
+  <section class="mt-space-xl">
+    <h2 class="font-display text-headline-md">Your documents</h2>
+    <div id="doc-list" class="mt-space-sm grid gap-space-sm sm:grid-cols-2">
+      <p class="text-body-sm text-on-surface-variant">Loading…</p>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const dz = document.getElementById('dropzone');
+  const input = document.getElementById('file-input');
+  const card = document.getElementById('progress-card');
+  const bar = document.getElementById('progress-bar');
+  const statusEl = document.getElementById('progress-status');
+  const nameEl = document.getElementById('progress-filename');
+  const errEl = document.getElementById('upload-error');
+
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) start(e.dataTransfer.files[0]); });
+  input.addEventListener('change', () => { if (input.files[0]) start(input.files[0]); });
+
+  async function start(file) {
+    errEl.classList.add('hidden');
+    card.classList.remove('hidden');
+    nameEl.textContent = file.name;
+    statusEl.textContent = 'Uploading…';
+    bar.style.width = '25%';
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Upload failed');
+      const { id } = await res.json();
+      bar.style.width = '60%';
+      statusEl.textContent = 'Processing — extracting text and building summary…';
+      await poll(id);
+    } catch (e) {
+      errEl.textContent = e.message; errEl.classList.remove('hidden');
+      card.classList.add('hidden');
+    }
+  }
+
+  async function poll(id) {
+    for (let i = 0; i < 60; i++) {
+      const docs = await (await fetch('/api/documents')).json();
+      const doc = docs.find(d => d.id === id);
+      if (doc && doc.status === 'ready') {
+        bar.style.width = '100%';
+        statusEl.textContent = 'Ready! Summarized and indexed.';
+        loadDocs();
+        setTimeout(() => window.location = '/documents/' + id, 800);
+        return;
+      }
+      if (doc && doc.status === 'error') throw new Error(doc.error || 'Processing failed');
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    throw new Error('Processing timed out');
+  }
+
+  async function loadDocs() {
+    const docs = await (await fetch('/api/documents')).json();
+    const list = document.getElementById('doc-list');
+    list.innerHTML = docs.length ? '' : '<p class="text-body-sm text-on-surface-variant">No documents yet — upload above.</p>';
+    for (const d of docs) {
+      const a = document.createElement('a');
+      a.href = '/documents/' + d.id;
+      a.className = 'flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-3 shadow-card hover:bg-surface-container-low';
+      a.innerHTML = `<span class="material-symbols-rounded filled text-primary text-2xl">description</span>
+        <div class="min-w-0"><p class="truncate font-semibold text-body-sm">${d.title}</p>
+        <p class="text-label-sm text-outline">${d.status} · ${d.page_count} sections</p></div>`;
+      list.appendChild(a);
+    }
+  }
+  loadDocs();
+</script>
+{% endblock %}

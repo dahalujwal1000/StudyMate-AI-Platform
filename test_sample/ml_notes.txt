@@ -1,0 +1,29 @@
+Chapter 1: Introduction to Machine Learning
+
+Machine learning is a subfield of artificial intelligence that focuses on algorithms
+which improve automatically through experience. Supervised learning uses labeled
+datasets to train models that predict outputs for new inputs. Common supervised
+algorithms include linear regression, decision trees and support vector machines.
+
+Overfitting occurs when a model learns the training data too well, including its
+noise, and fails to generalize to unseen data. Regularization techniques such as
+L1 and L2 penalties reduce overfitting by constraining model weights.
+
+Chapter 2: Neural Networks
+
+A neural network is a computational model inspired by biological neurons. Each
+neuron computes a weighted sum of its inputs and applies an activation function
+such as ReLU or sigmoid. Backpropagation is the algorithm used to train neural
+networks by computing gradients of the loss function with respect to each weight.
+
+Gradient descent optimizes the weights by iteratively moving in the direction
+that reduces the loss. The learning rate controls the size of each step. A
+learning rate that is too high can cause divergence, while one that is too low
+makes training slow.
+
+Chapter 3: Evaluation Metrics
+
+Accuracy measures the fraction of correct predictions. Precision is the fraction
+of positive predictions that are actually positive. Recall is the fraction of
+actual positives that were predicted correctly. The F1 score is the harmonic
+mean of precision and recall, useful for imbalanced datasets.
