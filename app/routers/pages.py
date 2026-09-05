@@ -133,6 +133,7 @@ def settings_page(request: Request, db: Session = Depends(get_db), user: User = 
 
     return render(request, "settings.html", user, "settings",
                   llm_provider=cfg.llm_provider, llm_ready=llm.llm_available(),
+                  llm_chain=llm._provider_order(),
                   oauth_ready=bool(cfg.google_client_id))
 
 

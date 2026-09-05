@@ -18,7 +18,7 @@ plan study tasks and track progress.
 ## Tech stack
 - **Backend:** FastAPI + Jinja2 templates + Tailwind (CDN) — design tokens ported 1:1 from the Stitch design system
 - **DB:** SQLite via SQLAlchemy (swap to Postgres via `DATABASE_URL`)
-- **LLM:** Gemini (`google-genai`, free tier) or Groq (OpenAI-compatible) — set via env
+- **LLM:** Gemini, Mistral, or Groq (free tiers) with **automatic fallback** — set the primary via `LLM_PROVIDER`; any other provider with a key becomes a backup
 - **Retrieval:** in-memory TF-IDF index (stdlib) — swap for Chroma/FAISS later, callers depend only on `ChunkHit`
 - **Auth:** Google OAuth (authlib) with one-click demo login fallback
 
@@ -28,11 +28,24 @@ plan study tasks and track progress.
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-copy .env.example .env          # add GEMINI_API_KEY (free: https://aistudio.google.com/apikey)
+copy .env.example .env          # add GEMINI_API_KEY, MISTRAL_API_KEY, or GROQ_API_KEY (all free)
 uvicorn app.main:app --reload
 ```
 
 Open http://127.0.0.1:8000 → **Try the live demo** (no OAuth needed).
+
+### AI providers (all free tiers)
+Provider keys go in `.env`. `LLM_PROVIDER` sets the primary; every provider that
+has a key becomes an automatic fallback (e.g. `gemini` missing → tries `mistral` → `groq`).
+
+| Provider | Key | Get one at |
+|---|---|---|
+| Gemini (default) | `GEMINI_API_KEY` | https://aistudio.google.com/apikey |
+| Mistral | `MISTRAL_API_KEY` | https://console.mistral.ai |
+| Groq | `GROQ_API_KEY` | https://console.groq.com/keys |
+
+> Mistral's free tier is rate-limited; when it returns 429 the app automatically
+> falls back to the next configured provider instead of erroring.
 
 ### Optional: real Google sign-in
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create credentials → **OAuth client ID** → Web application.

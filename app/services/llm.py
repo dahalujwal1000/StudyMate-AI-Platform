@@ -1,9 +1,12 @@
-"""Provider-agnostic LLM wrapper.
+"""Provider-agnostic LLM wrapper with automatic fallback.
 
 - gemini (default): free tier via google-genai SDK
+- mistral: free tier via OpenAI-compatible API (https://api.mistral.ai)
 - groq: free tier via OpenAI-compatible API
-- offline fallback: when no API key is configured every call returns None and
-  the callers use extractive heuristics so the app stays fully demoable.
+- fallback chain: the configured provider is tried first; if it errors, any
+  other configured provider is tried next (e.g. gemini -> mistral -> groq).
+- offline: when NO provider has a key, every call returns None and callers use
+  extractive heuristics so the app stays fully demoable.
 """
 from __future__ import annotations
 
@@ -17,16 +20,35 @@ from ..config import settings
 GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_MODEL_FALLBACKS = ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"]
 GROQ_MODEL = "llama-3.3-70b-versatile"
+MISTRAL_MODEL = "mistral-small-latest"
+MISTRAL_MODEL_FALLBACKS = ["open-mistral-nemo", "mistral-medium-latest"]
+
+ALL_PROVIDERS = ("gemini", "mistral", "groq")
 
 
-class LLMUnavailable(Exception):
-    pass
+def _provider_keys() -> dict[str, str]:
+    return {
+        "gemini": (settings.gemini_api_key or "").strip(),
+        "mistral": (settings.mistral_api_key or "").strip(),
+        "groq": (settings.groq_api_key or "").strip(),
+    }
 
 
 def llm_available() -> bool:
-    if settings.llm_provider == "groq":
-        return bool(settings.groq_api_key)
-    return bool(settings.gemini_api_key)
+    return any(_provider_keys().values())
+
+
+def _provider_order() -> list[str]:
+    """Configured provider first; then every other provider that has a key."""
+    keys = _provider_keys()
+    primary = settings.llm_provider
+    order: list[str] = []
+    if primary in keys and keys[primary]:
+        order.append(primary)
+    for p in ALL_PROVIDERS:
+        if p not in order and keys.get(p):
+            order.append(p)
+    return order
 
 
 def _gemini_models() -> list[str]:
@@ -34,6 +56,15 @@ def _gemini_models() -> list[str]:
     primary = (settings.gemini_model or GEMINI_MODEL).strip()
     models = [primary]
     for m in [GEMINI_MODEL, *GEMINI_MODEL_FALLBACKS]:
+        if m not in models:
+            models.append(m)
+    return models
+
+
+def _mistral_models() -> list[str]:
+    primary = (settings.mistral_model or MISTRAL_MODEL).strip()
+    models = [primary]
+    for m in [MISTRAL_MODEL, *MISTRAL_MODEL_FALLBACKS]:
         if m not in models:
             models.append(m)
     return models
@@ -63,6 +94,40 @@ def _gemini_call(prompt: str, system: str, json_mode: bool, temperature: float) 
     raise RuntimeError(" | ".join(errors) if errors else "gemini returned no text")
 
 
+def _mistral_call(prompt: str, system: str, json_mode: bool, temperature: float) -> str | None:
+    errors: list[str] = []
+    for model in _mistral_models():
+        try:
+            resp = httpx.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.mistral_api_key}"},
+                json={
+                    "model": model,
+                    "temperature": temperature,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                    **({"response_format": {"type": "json_object"}} if json_mode else {}),
+                },
+                timeout=60,
+            )
+            if resp.status_code == 404:
+                errors.append(f"{model}: model not found")
+                continue
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            errors.append(f"{model}: {exc.response.status_code} {exc.response.text[:120]}")
+            if exc.response.status_code == 404:
+                continue
+            raise
+        except Exception as exc:
+            errors.append(f"{model}: {exc}")
+            raise
+    raise RuntimeError(" | ".join(errors) if errors else "mistral returned no text")
+
+
 def _groq_call(prompt: str, system: str, json_mode: bool, temperature: float) -> str | None:
     resp = httpx.post(
         "https://api.groq.com/openai/v1/chat/completions",
@@ -83,16 +148,21 @@ def _groq_call(prompt: str, system: str, json_mode: bool, temperature: float) ->
 
 
 def generate(prompt: str, system: str = "", json_mode: bool = False, temperature: float = 0.4) -> str | None:
-    """Call the configured provider. Returns None when unavailable/offline."""
-    if not llm_available():
+    """Call the first working provider. Returns None when fully offline."""
+    order = _provider_order()
+    if not order:
         return None
-    try:
-        if settings.llm_provider == "groq":
-            return _groq_call(prompt, system, json_mode, temperature)
-        return _gemini_call(prompt, system, json_mode, temperature)
-    except Exception as exc:  # noqa: BLE001 - degrade gracefully
-        print(f"[llm] call failed: {exc}")
-        return None
+    for provider in order:
+        try:
+            if provider == "gemini":
+                return _gemini_call(prompt, system, json_mode, temperature)
+            if provider == "mistral":
+                return _mistral_call(prompt, system, json_mode, temperature)
+            if provider == "groq":
+                return _groq_call(prompt, system, json_mode, temperature)
+        except Exception as exc:  # noqa: BLE001 - try the next provider
+            print(f"[llm] {provider} failed: {exc}")
+    return None
 
 
 def generate_json(prompt: str, system: str = "", temperature: float = 0.4) -> dict | list | None:

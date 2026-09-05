@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    mistral_api_key: str = ""
     gemini_model: str = ""  # override; defaults to gemini-3.6-flash
+    mistral_model: str = ""  # override; defaults to mistral-small-latest
 
     google_client_id: str = ""
     google_client_secret: str = ""

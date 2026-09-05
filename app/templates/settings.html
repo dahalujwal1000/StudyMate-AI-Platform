@@ -42,10 +42,24 @@
       <p class="text-body-sm text-on-surface-variant">
         No API key found. The app still works with extractive (non-AI) summaries and heuristic quizzes.
         For full AI power, add a free key to your <code class="rounded bg-surface-container px-1.5 py-0.5 text-label-sm">.env</code> file:
-        <a class="font-semibold text-primary hover:underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">GEMINI_API_KEY</a>
+        <a class="font-semibold text-primary hover:underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">GEMINI_API_KEY</a>,
+        <a class="font-semibold text-primary hover:underline" href="https://console.mistral.ai" target="_blank" rel="noopener">MISTRAL_API_KEY</a>
         or <a class="font-semibold text-primary hover:underline" href="https://console.groq.com/keys" target="_blank" rel="noopener">GROQ_API_KEY</a>,
         then restart the server.
       </p>
+      {% else %}
+      <div class="rounded-lg bg-surface-container-low px-space-md py-3">
+        <p class="text-label-sm font-semibold uppercase tracking-wide text-on-surface-variant">Fallback chain</p>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+          {% for p in llm_chain %}
+          <span class="inline-flex items-center gap-1 rounded-full {{ 'bg-primary-fixed text-on-primary-fixed' if loop.first else 'bg-surface-container-high text-on-surface-variant' }} px-3 py-1 text-label-sm font-semibold">
+            {{ p|capitalize }}{% if loop.first %} · primary{% endif %}
+          </span>
+          {% if not loop.last %}<span class="material-symbols-rounded text-lg text-outline">arrow_forward</span>{% endif %}
+          {% endfor %}
+        </div>
+        <p class="mt-1 text-label-sm text-on-surface-variant">If the primary provider fails or is rate-limited, the next one is tried automatically.</p>
+      </div>
       {% endif %}
     </div>
   </section>
