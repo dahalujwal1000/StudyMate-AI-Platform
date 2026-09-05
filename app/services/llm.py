@@ -14,7 +14,8 @@ import httpx
 
 from ..config import settings
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MODEL_FALLBACKS = ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"]
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
@@ -28,18 +29,38 @@ def llm_available() -> bool:
     return bool(settings.gemini_api_key)
 
 
+def _gemini_models() -> list[str]:
+    """Models to try in order (settings override first)."""
+    primary = (settings.gemini_model or GEMINI_MODEL).strip()
+    models = [primary]
+    for m in [GEMINI_MODEL, *GEMINI_MODEL_FALLBACKS]:
+        if m not in models:
+            models.append(m)
+    return models
+
+
 def _gemini_call(prompt: str, system: str, json_mode: bool, temperature: float) -> str | None:
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=settings.gemini_api_key)
     cfg = types.GenerateContentConfig(
         system_instruction=system or None,
         temperature=temperature,
         response_mime_type="application/json" if json_mode else None,
     )
-    resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt, config=cfg)
-    return resp.text
+    errors: list[str] = []
+    for model in _gemini_models():
+        try:
+            client = genai.Client(api_key=settings.gemini_api_key)
+            resp = client.models.generate_content(model=model, contents=prompt, config=cfg)
+            if resp and resp.text:
+                return resp.text
+            break
+        except Exception as exc:  # try the next available model
+            errors.append(f"{model}: {exc}")
+            if "NOT_FOUND" not in str(exc):
+                break
+    raise RuntimeError(" | ".join(errors) if errors else "gemini returned no text")
 
 
 def _groq_call(prompt: str, system: str, json_mode: bool, temperature: float) -> str | None:

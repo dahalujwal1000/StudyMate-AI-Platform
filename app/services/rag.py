@@ -26,7 +26,8 @@ def tokenize(text: str) -> list[str]:
 
 
 def split_sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[.!?])\s+|\n+", text)
+    flat = re.sub(r"\s+", " ", text)
+    parts = re.split(r"(?<=[.!?])\s+", flat)
     return [p.strip() for p in parts if p and p.strip() and len(p.strip()) > 20]
 
 

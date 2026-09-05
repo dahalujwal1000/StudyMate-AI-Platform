@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    gemini_model: str = ""  # override; defaults to gemini-3.6-flash
 
     google_client_id: str = ""
     google_client_secret: str = ""
