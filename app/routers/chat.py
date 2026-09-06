@@ -56,7 +56,7 @@ def chat(body: ChatIn, db: Session = Depends(get_db), user: User = Depends(get_c
             .all()
         )
 
-    answer, citations = _answer(doc.title, body.message, hits, doc.summary or "", overview)
+    answer, citations = _answer(doc.title, body.message, hits, doc.summary or "", overview, _prior_history(db, user.id, doc.id))
 
     ai_msg = ChatMessage(user_id=user.id, document_id=doc.id, role="assistant",
                          content=answer, citations=citations)
@@ -71,9 +71,26 @@ def chat(body: ChatIn, db: Session = Depends(get_db), user: User = Depends(get_c
     }
 
 
-def _answer(title: str, question: str, hits, summary: str = "", overview=()) -> tuple[str, list[dict]]:
+def _prior_history(db: Session, user_id: int, document_id: int) -> list[tuple[str, str]]:
+    """Return the last N turns (user+assistant) so the model can follow context."""
+    msgs = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user_id, ChatMessage.document_id == document_id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    pairs: list[tuple[str, str]] = []
+    for m in reversed(msgs):
+        if m.role in ("user", "assistant") and m.content:
+            pairs.append((m.role, m.content))
+    return pairs[-6:]
+
+
+def _answer(title: str, question: str, hits, summary: str = "", overview=(), history=None) -> tuple[str, list[dict]]:
     # hits = keyword-retrieved excerpts; overview = opening chunks used when retrieval
-    # found nothing. Both are real content objects with .label/.content.
+    # found nothing. history = prior [(role, content), ...] turns for multi-turn context.
+    history = history or []
     excerpts = list(hits) if hits else list(overview)
 
     parts: list[str] = []
@@ -87,7 +104,7 @@ def _answer(title: str, question: str, hits, summary: str = "", overview=()) -> 
             f"Study material from '{title}':\n\n{context}\n\n"
             f"Student question: {question}"
         )
-        out = llm.generate(prompt, system=SYSTEM_CHAT, temperature=0.3)
+        out = llm.generate_chat(prompt, system=SYSTEM_CHAT, history=history, temperature=0.3)
         if out:
             cited = _used_citations(out, len(excerpts))
             return out.strip(), [

@@ -31,10 +31,13 @@ def generate_mcqs(title: str, chunks: list[str], n: int = 5) -> list[dict]:
     context = _build_context(chunks)
     prompt = (
         f"Study material from '{title}':\n\n{context}\n\n"
-        f"Create {n} exam-style multiple-choice questions that genuinely test UNDERSTANDING "
-        f"of this material — e.g. definitions, mechanisms, comparisons, consequences or "
-        f"applications. Never use fill-in-the-blank. Each question must have exactly 4 "
-        f"plausible options with one clearly correct answer.\n"
+        f"Create {n} realistic, exam-style multiple-choice questions that genuinely test "
+        f"UNDERSTANDING and practical recall of this material — e.g. real definitions, mechanisms, "
+        f"step-by-step processes, comparisons, consequences or real-life applications. "
+        f"Write them the way a real exam paper would (clear stems, realistic scenario phrasing), "
+        f"never fill-in-the-blank. Each question must have exactly 4 plausible options that a "
+        f"struggling student would actually consider, with exactly one clearly correct answer. "
+        f"Make the distractors realistic and close, not obviously wrong.\n"
         'Respond as JSON: {"questions": [{"question": str, "options": [str, str, str, str], '
         '"answer_idx": 0-3, "explanation": str}]}'
     )

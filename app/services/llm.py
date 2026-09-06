@@ -19,7 +19,8 @@ from ..config import settings
 
 GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_MODEL_FALLBACKS = ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"]
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
+GROQ_MODEL_FALLBACKS = ["openai/gpt-oss-20b", "qwen/qwen3.8-27b", "allam-2-7b"]
 MISTRAL_MODEL = "mistral-small-latest"
 MISTRAL_MODEL_FALLBACKS = ["open-mistral-nemo", "mistral-medium-latest"]
 
@@ -65,6 +66,15 @@ def _mistral_models() -> list[str]:
     primary = (settings.mistral_model or MISTRAL_MODEL).strip()
     models = [primary]
     for m in [MISTRAL_MODEL, *MISTRAL_MODEL_FALLBACKS]:
+        if m not in models:
+            models.append(m)
+    return models
+
+
+def _groq_models() -> list[str]:
+    primary = GROQ_MODEL
+    models = [primary]
+    for m in [GROQ_MODEL, *GROQ_MODEL_FALLBACKS]:
         if m not in models:
             models.append(m)
     return models
@@ -129,22 +139,128 @@ def _mistral_call(prompt: str, system: str, json_mode: bool, temperature: float)
 
 
 def _groq_call(prompt: str, system: str, json_mode: bool, temperature: float) -> str | None:
-    resp = httpx.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-        json={
-            "model": GROQ_MODEL,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-            **({"response_format": {"type": "json_object"}} if json_mode else {}),
-        },
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    errors: list[str] = []
+    for model in _groq_models():
+        try:
+            resp = httpx.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                json={
+                    "model": model,
+                    "temperature": temperature,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                    **({"response_format": {"type": "json_object"}} if json_mode else {}),
+                },
+                timeout=90,
+            )
+            if resp.status_code == 404:
+                errors.append(f"{model}: model not found")
+                continue
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            errors.append(f"{model}: {exc.response.status_code} {exc.response.text[:160]}")
+            if exc.response.status_code == 404:
+                continue
+            raise
+        except Exception as exc:
+            errors.append(f"{model}: {exc}")
+            raise
+    raise RuntimeError(" | ".join(errors) if errors else "groq returned no text")
+
+
+def _openai_chat(
+    url: str,
+    api_key: str,
+    models: list[str],
+    messages: list[dict],
+    json_mode: bool,
+    temperature: float,
+) -> str | None:
+    """OpenAI-compatible multi-turn call that tries each model in order."""
+    errors: list[str] = []
+    for model in models:
+        try:
+            resp = httpx.post(
+                url,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "temperature": temperature,
+                    "messages": messages,
+                    **({"response_format": {"type": "json_object"}} if json_mode else {}),
+                },
+                timeout=90,
+            )
+            if resp.status_code == 404:
+                errors.append(f"{model}: model not found")
+                continue
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            errors.append(f"{model}: {exc.response.status_code} {exc.response.text[:160]}")
+            if exc.response.status_code == 404:
+                continue
+            raise
+        except Exception as exc:
+            errors.append(f"{model}: {exc}")
+            raise
+    raise RuntimeError(" | ".join(errors) if errors else "provider returned no text")
+
+
+def generate_chat(
+    prompt: str,
+    system: str = "",
+    history: list[tuple[str, str]] | None = None,
+    json_mode: bool = False,
+    temperature: float = 0.3,
+) -> str | None:
+    """Multi-turn aware generation — the full conversation is sent to the model.
+
+    history is [(role, content), ...] with role in {\"user\", \"assistant\"} so the
+    model actually follows prior turns instead of answering each question in a vacuum.
+    """
+    history = history or []
+    order = _provider_order()
+    if not order:
+        return None
+
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    for role, content in history:
+        messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": prompt})
+
+    for provider in order:
+        try:
+            if provider == "groq":
+                return _openai_chat(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    settings.groq_api_key,
+                    _groq_models(),
+                    messages,
+                    json_mode,
+                    temperature,
+                )
+            if provider == "mistral":
+                return _openai_chat(
+                    "https://api.mistral.ai/v1/chat/completions",
+                    settings.mistral_api_key,
+                    _mistral_models(),
+                    messages,
+                    json_mode,
+                    temperature,
+                )
+            if provider == "gemini":
+                _mixed = "".join(f"\n\n{role.capitalize()}: {content}" for role, content in history)
+                return _gemini_call(prompt + _mixed, system, json_mode, temperature)
+        except Exception as exc:  # noqa: BLE001 - try the next provider
+            print(f"[llm] {provider} failed: {exc}")
+    return None
 
 
 def generate(prompt: str, system: str = "", json_mode: bool = False, temperature: float = 0.4) -> str | None:
